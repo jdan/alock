@@ -2,20 +2,15 @@ var EventEmitter = require('events').EventEmitter;
 var locks = {};
 
 function lock(key, callback) {
-  /* Function to acquire a lock and invoke the callback */
-  function acquire() {
-    locks[key] = new EventEmitter();
-    callback(unlock(key));
-  }
-
   if (locks[key] && !locks[key].released) {
-    /* This key has been locked, set an event listener */
+    /* This key has been locked, set an event listener to retry */
     locks[key].on('free', function () {
-      acquire();
+      lock(key, callback);
     });
   } else {
     /* The lock has been released, acquire one ourselves */
-    acquire();
+    locks[key] = new EventEmitter();
+    callback(unlock(key));
   }
 }
 
@@ -24,9 +19,9 @@ function lock(key, callback) {
  */
 function unlock(key) {
   return function () {
-    locks[key].emit('free');
-    /* Set `released` to true so someone who comes along later can use it */
+    /* Set `released` to true and emit a "free" event */
     locks[key].released = true;
+    locks[key].emit('free');
   };
 }
 
